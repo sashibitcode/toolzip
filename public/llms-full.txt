@@ -1,0 +1,112 @@
+# TOOLZIP (https://toolzip.io) - Complete Technical & Identity Documentation
+
+## 1. Project Overview & Vision
+TOOLZIP is a production-grade, privacy-centric, document-first web application engineered to provide 27 essential PDF conversion, organization, optimization, and editing tools. It bridges modern editorial aesthetics with enterprise-grade conversion pipelines while strictly enforcing a zero-cloud-retention guarantee.
+
+## 2. Developer & Author Entity (E-E-A-T Framework)
+- **Primary Developer & Architect:** Shashikant Raj
+- **Consistent Author Title:** Shashikant Raj | Data Analyst & Full Stack Developer
+- **Job Title:** Data Analyst & Full Stack Developer
+- **Brand / Online Handle:** sashibitcode
+- **Personal Portfolio:** https://sashibitcode.vercel.app/
+- **Academic Background:** B.Tech Computer Science & Engineering, Jagannath University, Jaipur, India
+- **Core Competencies:** Data Analytics, Python, SQL, Power BI, Exploratory Data Analysis, Machine Learning, Full-Stack Architecture, Document Systems, Next.js, React, Node.js
+- **Primary Email:** sashibitcode@gmail.com
+- **Verified Entity Profiles:**
+  - GitHub: https://github.com/sashibitcode
+  - LinkedIn: https://www.linkedin.com/in/sashikant-raj/
+  - LeetCode: https://leetcode.com/u/sashibitcode/
+  - Instagram: https://www.instagram.com/sashibitcode/
+- **Other Notable Projects:**
+  - SAS Music: https://sashibitcode-music.vercel.app/ (Production PWA music player with Google Drive integration)
+  - Portfolio & Interactive Analytics Hub: https://sashibitcode.vercel.app/
+
+## 3. Tool Directory & Capabilities (27 Tools)
+
+### A. Organize Suite
+1. **Merge PDF (`/tools/merge-pdf`)**
+   - Combines multiple PDF files into one ordered document.
+   - Preserves vector graphics, annotations, and bookmarks.
+2. **Split PDF (`/tools/split-pdf`)**
+   - Breaks PDFs apart by custom ranges (e.g., 1-5, 8, 11-14) or extracts every page into a ZIP archive.
+3. **Rotate PDF (`/tools/rotate-pdf`)**
+   - Rotates all pages or specific pages by 90, 180, or 270 degrees clockwise.
+4. **Delete PDF Pages (`/tools/delete-pdf-pages`)**
+   - Strips blank or unneeded pages from existing documents without re-encoding unaffected pages.
+5. **Extract PDF Pages (`/tools/extract-pdf-pages`)**
+   - Pulls targeted page subsets into an independent, compact PDF.
+6. **Organize PDF (`/tools/organize-pdf`)**
+   - Interactive visual reordering of pages with live thumbnail previews.
+
+### B. Convert to PDF Suite
+7. **Word to PDF (`/tools/word-to-pdf`)**
+   - Converts DOC and DOCX files to PDF with accurate layout, font, table, and bullet formatting.
+8. **Excel to PDF (`/tools/excel-to-pdf`)**
+   - Converts XLS, XLSX, and CSV sheets into paginated, print-ready PDF tables.
+9. **PowerPoint to PDF (`/tools/ppt-to-pdf`)**
+   - Converts PPT and PPTX slide presentations into high-resolution PDF handouts.
+10. **JPG to PDF (`/tools/jpg-to-pdf`)**
+    - Converts JPEG and JPG images into structured PDF pages with automatic aspect ratio scaling.
+11. **PNG to PDF (`/tools/png-to-pdf`)**
+    - Converts transparent and lossless PNG images into PDF format.
+12. **HTML to PDF (`/tools/html-to-pdf`)**
+    - Headless Chromium rendering for web pages, raw HTML, and CSS into pixel-perfect PDF.
+13. **Markdown to PDF (`/tools/markdown-to-pdf`)**
+    - Parses GFM (GitHub Flavored Markdown) with code syntax highlighting into typographic PDFs.
+14. **TXT to PDF (`/tools/txt-to-pdf`)**
+    - Formats raw plaintext into monospaced or proportional paginated PDFs with header and footer rules.
+15. **Code to PDF (`/tools/code-to-pdf`)**
+    - Formats programming language source code with line numbering and syntax theme styling into PDF.
+
+### C. Convert from PDF Suite
+16. **PDF to Word (`/tools/pdf-to-word`)**
+    - Converts PDF documents into editable Microsoft Word (.docx) files.
+17. **PDF to Excel (`/tools/pdf-to-excel`)**
+    - Detects tabular data structures in PDFs and outputs editable Microsoft Excel (.xlsx) spreadsheets.
+18. **PDF to PowerPoint (`/tools/pdf-to-ppt`)**
+    - Extracts PDF page content into editable Microsoft PowerPoint (.pptx) presentation decks.
+19. **PDF to JPG (`/tools/pdf-to-jpg`)**
+    - Renders high-DPI raster images for each page of a PDF document in JPEG format.
+20. **PDF to PNG (`/tools/pdf-to-png`)**
+    - Lossless page rendering with sharp typography and transparency support.
+21. **PDF to TXT (`/tools/pdf-to-txt`)**
+    - Fast plain-text extraction suitable for NLP, LLM indexing, and accessibility screen reading.
+
+### D. Optimize & Security Suite
+22. **Compress PDF (`/tools/compress-pdf`)**
+    - Reduces file size through intelligent image downsampling, stream deflating, and font deduplication.
+23. **Protect PDF (`/tools/protect-pdf`)**
+    - Encrypts documents with AES-256 standard and customizable permission restrictions.
+24. **Unlock PDF (`/tools/unlock-pdf`)**
+    - Removes owner restrictions and user passwords with authorized master keys.
+25. **Flatten PDF (`/tools/flatten-pdf`)**
+    - Converts interactive AcroForms and dynamic annotations into static page primitives.
+26. **PDF/A Archival Converter (`/tools/pdf-to-pdfa`)**
+    - Standardizes PDFs to ISO 19005 compliance for legal and government long-term digital preservation.
+27. **Repair PDF (`/tools/repair-pdf`)**
+    - Reconstructs corrupted XREF tables, trailer dictionaries, and repairable stream defects.
+
+### E. Edit & Sign Suite
+- **Direct PDF Editor Studio (`/tools/edit-pdf`)**
+  - In-browser canvas editor for text replacement, annotation highlights, freehand drawing, and watermarking.
+- **Sign PDF (`/tools/sign-pdf`)**
+  - Draw, type, or upload digital signatures with timestamp audit stamps.
+
+## 4. Security & Zero-Retention Architecture
+1. **Isolated Scratchpads:** Every uploaded file is written to an isolated directory named by a cryptographic UUIDv4 (`/storage/jobs/[uuid]/`).
+2. **Ephemeral Lifespan:** Workspaces are purged immediately following download or after an absolute cutoff of 30 minutes via scheduled background cron sweeps.
+3. **No Database Logging of Files:** File contents, binary streams, or document text are never saved to persistent databases or third-party cloud storage.
+4. **Header Defenses:** Built with `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and strict CORS policies.
+
+## 5. Agentic Browsing & Accessibility Architecture
+- Semantic HTML landmarks (`<main id="main-content">`, `<header role="banner">`, `<footer role="contentinfo">`, `<nav aria-label="...">`).
+- Direct keyboard focus navigation and visible outline styling (`focus-visible:ring-2`).
+- Descriptive file upload labels (`aria-label="Upload document for conversion"`, `data-testid="file-dropzone"`).
+- Deterministic download triggers allowing automated agents (OpenAI Operator, Claude Computer Use) to process documents end-to-end without UI failures.
+
+## 6. Multi-Engine Indexing Strategy
+- **AEO (Answer Engine Optimization):** Explicit FAQPage schemas on Home and tool pages providing concise answers to user queries for rich snippets.
+- **GEO (Generative Engine Optimization):** Structured data and entity citations for generative AI engines (Google AI Overviews, Perplexity, Copilot, ChatGPT Search).
+- **LLMO (Large Language Model Optimization):** Standardized context specification via `/llms.txt` and `/llms-full.txt`.
+- **AISEO:** Inclusive crawler policy in `robots.txt` and automated IndexNow instant pinging.
+- **E-E-A-T Framework:** Transparent authorship by Shashikant Raj, backed by verifiable academic credentials, live portfolio, and professional software engineering track record.

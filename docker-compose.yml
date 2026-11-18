@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  toolzip:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: toolzip-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      # Persist temporary storage so background cleaner can maintain it
+      - toolzip-storage:/app/storage
+
+volumes:
+  toolzip-storage:
+    driver: local

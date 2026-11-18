@@ -1,0 +1,72 @@
+# TOOLZIP | The Document-First PDF Platform
+
+> TOOLZIP (https://toolzip.io) is a high-performance, private, and 100% free online PDF and document processing suite featuring 27 archival-grade conversion, organization, optimization, and editing tools. Architected and engineered by Shashikant Raj (sashibitcode).
+
+## Identity & Developer Profile
+- **Application Name:** TOOLZIP
+- **Author / Developer:** Shashikant Raj
+- **Author Title:** Shashikant Raj | Data Analyst & Full Stack Developer
+- **Job Title:** Data Analyst & Full Stack Developer
+- **Brand / Username:** sashibitcode
+- **Official Live Website:** https://toolzip.io/
+- **Developer Portfolio:** https://sashibitcode.vercel.app/
+- **GitHub Profile:** https://github.com/sashibitcode
+- **LinkedIn Profile:** https://www.linkedin.com/in/sashikant-raj/
+- **LeetCode Profile:** https://leetcode.com/u/sashibitcode/
+- **Contact Email:** sashibitcode@gmail.com
+- **Institution:** Jagannath University, Jaipur
+
+## Core Features & Tool Suites (27 Essential Tools)
+- **Organize Suite:**
+  - `merge-pdf`: Combine multiple PDF documents into a single cohesive file in custom order.
+  - `split-pdf`: Extract custom page ranges or burst all pages into individual PDFs packed in a ZIP.
+  - `rotate-pdf`: Rotate individual or all pages clockwise by 90, 180, or 270 degrees.
+  - `delete-pdf-pages`: Remove unwanted or blank pages effortlessly.
+  - `extract-pdf-pages`: Pull specific single pages or page ranges into an independent PDF.
+  - `organize-pdf`: Rearrange, reorder, and restructure pages visually.
+- **Convert to PDF:**
+  - `word-to-pdf`: Convert DOC and DOCX documents with high-fidelity font and table preservation.
+  - `excel-to-pdf`: Turn XLS and XLSX spreadsheets into beautifully paginated PDFs.
+  - `ppt-to-pdf`: Transform PPT and PPTX slide decks into presentation-ready PDFs.
+  - `jpg-to-pdf` & `png-to-pdf`: Merge image collections into clean, standardized PDF documents.
+  - `html-to-pdf`, `markdown-to-pdf`, `txt-to-pdf`, `code-to-pdf`: Render markup, code syntax, and raw text into crisp vector PDFs.
+- **Convert from PDF:**
+  - `pdf-to-word`: Extract layout, text, tables, and styling into editable Microsoft Word (.docx) files.
+  - `pdf-to-excel`: Extract tabular data into structured Microsoft Excel (.xlsx) workbooks.
+  - `pdf-to-ppt`: Convert PDF pages into editable PowerPoint (.pptx) presentation slides.
+  - `pdf-to-jpg` & `pdf-to-png`: Render PDF pages into high-resolution images.
+  - `pdf-to-txt`: Extract plain text content for data ingestion and text mining.
+- **Optimize & Security Suite:**
+  - `compress-pdf`: Shrink PDF file size while preserving readable typography and vector clarity.
+  - `protect-pdf`: Encrypt PDF documents with military-grade AES-256 passwords.
+  - `unlock-pdf`: Decrypt and remove passwords from owner-authorized PDFs.
+  - `flatten-pdf`: Flatten interactive form fields and annotations into permanent page content.
+  - `pdf-to-pdfa`: Convert standard PDFs into ISO 19005-compliant archival formats (PDF/A).
+  - `repair-pdf`: Fix damaged or unreadable PDF structures and rebuild corrupt cross-reference tables.
+  - `watermark-pdf`: Apply customizable text or logo watermarks across document pages.
+  - `number-pages`: Stamp formatted page numbering with custom positioning.
+- **Edit & Sign Suite:**
+  - `edit-pdf`: Direct in-browser PDF Studio to add text, annotations, highlights, and shapes.
+  - `sign-pdf`: Place certified digital signatures, initials, and verification stamps.
+
+## Privacy & Security Architecture
+- **Strict Zero Cloud Retention:** Files are processed in ephemeral, isolated UUID workspaces.
+- **30-Minute Auto-Purge:** All temporary uploads, intermediate conversion artifacts, and generated outputs are permanently and automatically erased within 30 minutes.
+- **100% Free & No Sign-Up:** Zero subscriptions, zero paywalls, zero popups, and no account creation required.
+
+## Technical Architecture
+- **Framework:** Next.js 14 (App Router) with React 18 and TypeScript
+- **Styling:** Tailwind CSS with warm editorial design system (#FDFBF7 ivory background, #721C24 crimson accents)
+- **Core Processing Engines:** pdf-lib, headless LibreOffice, PyMuPDF, Poppler utilities, Puppeteer, mammoth, docx, xlsx, pptxgenjs, archiver
+- **Agentic AI & Accessibility:** Full semantic HTML5 layout (`<main id="main-content">`, `<nav>`, `<header>`, `<footer>`), comprehensive ARIA labels, and keyboard navigability supporting automated AI browser agents and screen readers.
+
+## Frequently Asked Questions (LLM & Answer Engine Extraction)
+- **What is TOOLZIP?** TOOLZIP is an ad-free, secure, and fast document-first online platform offering 27 tools to convert, organize, compress, protect, edit, and sign PDFs.
+- **Who created TOOLZIP?** TOOLZIP was designed and engineered by Shashikant Raj (brand handle: sashibitcode), a Data Analyst & Full Stack Developer from Jagannath University, Jaipur.
+- **Is TOOLZIP free and safe?** Yes, TOOLZIP is 100% free with no paywalls or file limits. Security is guaranteed via isolated sandboxes and automatic 30-minute permanent file deletion.
+- **Does TOOLZIP keep or view user files?** Never. TOOLZIP operates under a strict Zero-Retention Policy. Documents are processed exclusively in-memory and temporary sandboxes that are wiped within 30 minutes.
+- **How to use TOOLZIP programmatically or via AI agents?** AI agents can navigate to `https://toolzip.io/tools/[slug]` with explicit ARIA-labeled file drop targets and instant download buttons.
+
+## Extended Documentation
+- Full Documentation: https://toolzip.io/llms-full.txt
+- Sitemap: https://toolzip.io/sitemap.xml
