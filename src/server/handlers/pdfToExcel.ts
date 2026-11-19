@@ -17,35 +17,40 @@ export const pdfToExcelHandler: ToolHandler = {
     const outputFilename = `${baseName}.xlsx`;
     const outputPath = path.join(outputDir, outputFilename);
 
-    // Method 1: Try LibreOffice Calc conversion
+    // Method 1: LibreOffice if available
     const isSofficeAvailable = (await hasBinary('soffice')) || (await hasBinary('libreoffice'));
     if (isSofficeAvailable) {
       try {
         const binary = (await hasBinary('soffice')) ? 'soffice' : 'libreoffice';
-        await execSafe(binary, [
-          '--headless',
-          '--infilter=calc_pdf_import',
-          '--convert-to',
-          'xlsx',
-          '--outdir',
-          outputDir,
-          inputFile.filepath,
-        ], { timeoutMs: 90000 });
+        await execSafe(
+          binary,
+          [
+            '--headless',
+            '--infilter=writer_pdf_import',
+            '--convert-to',
+            'xlsx',
+            '--outdir',
+            outputDir,
+            inputFile.filepath,
+          ],
+          { timeoutMs: 60000 }
+        );
 
-        const generatedFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.xlsx'));
+        const generatedFiles = fs.readdirSync(outputDir).filter((f) => f.endsWith('.xlsx'));
         if (generatedFiles.length > 0) {
           return {
             outputPath: path.join(outputDir, generatedFiles[0]),
             outputFilename: generatedFiles[0],
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           };
         }
       } catch (err: any) {
-        console.warn('LibreOffice Calc conversion failed, checking fallback...', err?.message);
+        console.warn('LibreOffice PDF-to-Excel failed, falling back...', err?.message);
       }
     }
 
-    // Method 2: Python PyMuPDF table extraction (built-in find_tables)
+    // Method 2: Python if available
     const hasPython = (await hasBinary('python')) || (await hasBinary('python3'));
     if (hasPython) {
       const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
@@ -58,32 +63,34 @@ except ImportError:
     import fitz
 
 doc = fitz.open(sys.argv[1])
-all_rows = []
-
+rows = []
 for page in doc:
-    # Try finding structured tables first
     tabs = page.find_tables()
     if tabs.tables:
         for tab in tabs:
             for row in tab.extract():
-                all_rows.append([c if c is not None else "" for c in row])
+                rows.append([c or "" for c in row])
     else:
-        # Fallback to text blocks
-        blocks = page.get_text("blocks")
-        for b in blocks:
-            if b[6] == 0:
-                line_parts = [p.strip() for p in b[4].split("\\n") if p.strip()]
-                if line_parts:
-                    all_rows.append(line_parts)
+        text = page.get_text("text")
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                import re
+                cols = re.split(r'\\s{2,}|\\t', line)
+                rows.append(cols)
 
-print(json.dumps(all_rows))
+print(json.dumps(rows))
 `;
-        const res = await execSafe(pythonBin, ['-c', pyScript, inputFile.filepath], { timeoutMs: 45000 });
+        const res = await execSafe(pythonBin, ['-c', pyScript, inputFile.filepath], {
+          timeoutMs: 45000,
+        });
         const rawJson = res.stdout.substring(res.stdout.indexOf('['));
         const rows: any[][] = JSON.parse(rawJson);
 
         const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(rows.length > 0 ? rows : [['PDF Data Extraction', 'No content detected']]);
+        const ws = XLSX.utils.aoa_to_sheet(
+          rows.length > 0 ? rows : [['PDF Data Extraction', 'No content detected']]
+        );
         XLSX.utils.book_append_sheet(wb, ws, 'Extracted Data');
         XLSX.writeFile(wb, outputPath);
 
@@ -91,50 +98,51 @@ print(json.dumps(all_rows))
           return {
             outputPath,
             outputFilename,
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           };
         }
       } catch (err: any) {
-        console.warn('PyMuPDF table extraction failed...', err?.message);
+        console.warn('Python table extraction failed, falling back...', err?.message);
       }
     }
 
-    // Method 3: Poppler pdftotext layout
-    const isPdftotext = await hasBinary('pdftotext');
-    if (isPdftotext) {
-      const txtPath = path.join(outputDir, `${baseName}_layout.txt`);
-      await execSafe('pdftotext', ['-layout', inputFile.filepath, txtPath], { timeoutMs: 30000 });
+    // Method 3: Pure Node.js fallback via pdf-parse & SheetJS (100% Vercel Serverless compatible)
+    const inBytes = fs.readFileSync(inputFile.filepath);
+    const { PDFParse } = await import('pdf-parse');
+    const parser = new (PDFParse as any)({ data: new Uint8Array(inBytes) });
 
-      if (fs.existsSync(txtPath)) {
-        const rawContent = fs.readFileSync(txtPath, 'utf8');
-        const lines = rawContent.split(/\r?\n/);
-        const dataRows: string[][] = [];
+    try {
+      const textObj = await parser.getText();
+      const wb = XLSX.utils.book_new();
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const cols = line.split(/\s{2,}|\t/).map(c => c.trim()).filter(Boolean);
-          if (cols.length > 0) {
-            dataRows.push(cols);
-          }
-        }
+      for (let i = 0; i < textObj.pages.length; i++) {
+        const rawLines = (textObj.pages[i].text || '')
+          .split(/\r?\n/)
+          .filter((l: string) => l.trim().length > 0);
 
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(dataRows.length > 0 ? dataRows : [['PDF Text Export', 'No structured tables found']]);
-        XLSX.utils.book_append_sheet(wb, ws, 'Extracted Data');
-        XLSX.writeFile(wb, outputPath);
+        const rows = rawLines.map((line: string) => {
+          return line.split(/\t|\s{2,}|,\s*/).map((c: string) => c.trim());
+        });
 
-        try { fs.unlinkSync(txtPath); } catch {}
-
-        return {
-          outputPath,
-          outputFilename,
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        };
+        const ws = XLSX.utils.aoa_to_sheet(
+          rows.length > 0 ? rows : [['Document Page ' + (i + 1), 'No text detected']]
+        );
+        XLSX.utils.book_append_sheet(wb, ws, `Page ${i + 1}`);
       }
-    }
 
-    throw new Error(
-      'PDF to Excel requires Python (PyMuPDF), LibreOffice, or Poppler.'
-    );
+      XLSX.writeFile(wb, outputPath);
+
+      return {
+        outputPath,
+        outputFilename,
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      };
+    } finally {
+      try {
+        await parser.destroy();
+      } catch {}
+    }
   },
 };

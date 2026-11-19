@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import mammoth from 'mammoth';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { ToolHandler, ConversionContext, ConversionResult } from './types';
 import { execSafe, hasBinary } from '../utils/execHelper';
 
@@ -40,16 +41,13 @@ export const wordToPdfHandler: ToolHandler = {
     if (isSofficeAvailable) {
       try {
         const binary = (await hasBinary('soffice')) ? 'soffice' : 'libreoffice';
-        await execSafe(binary, [
-          '--headless',
-          '--convert-to',
-          'pdf',
-          '--outdir',
-          outputDir,
-          inputFile.filepath,
-        ], { timeoutMs: 60000 });
+        await execSafe(
+          binary,
+          ['--headless', '--convert-to', 'pdf', '--outdir', outputDir, inputFile.filepath],
+          { timeoutMs: 60000 }
+        );
 
-        const generatedFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.pdf'));
+        const generatedFiles = fs.readdirSync(outputDir).filter((f) => f.endsWith('.pdf'));
         if (generatedFiles.length > 0) {
           return {
             outputPath: path.join(outputDir, generatedFiles[0]),
@@ -58,11 +56,11 @@ export const wordToPdfHandler: ToolHandler = {
           };
         }
       } catch (err: any) {
-        console.warn('LibreOffice Word-to-PDF failed, falling back to mammoth engine...', err?.message);
+        console.warn('LibreOffice Word-to-PDF failed, falling back...', err?.message);
       }
     }
 
-    // Method 2: Mammoth (DOCX to HTML) + Puppeteer (Edge/Chrome to PDF)
+    // Method 2: Mammoth (DOCX to HTML) + Puppeteer (Edge/Chrome to PDF) if browser is available
     const browserPath = getBrowserPath();
     if (browserPath && inputFile.originalFilename.toLowerCase().endsWith('.docx')) {
       try {
@@ -75,19 +73,12 @@ export const wordToPdfHandler: ToolHandler = {
 <head>
   <meta charset="utf-8">
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.6;
-      color: #1a1a1a;
-      padding: 40px;
-      font-size: 14px;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; padding: 40px; font-size: 14px; }
     h1, h2, h3, h4, h5 { color: #111; margin-top: 1.2em; margin-bottom: 0.6em; }
     p { margin-bottom: 0.8em; }
     table { border-collapse: collapse; width: 100%; margin: 1em 0; }
     th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
     th { background-color: #f7f7f7; font-weight: bold; }
-    img { max-width: 100%; height: auto; }
   </style>
 </head>
 <body>
@@ -117,7 +108,9 @@ export const wordToPdfHandler: ToolHandler = {
         });
 
         await browser.close();
-        try { fs.unlinkSync(tempHtmlPath); } catch {}
+        try {
+          fs.unlinkSync(tempHtmlPath);
+        } catch {}
 
         if (fs.existsSync(outputPath)) {
           return {
@@ -127,12 +120,94 @@ export const wordToPdfHandler: ToolHandler = {
           };
         }
       } catch (err: any) {
-        console.warn('Mammoth + Puppeteer conversion failed...', err?.message);
+        console.warn('Mammoth + Puppeteer conversion failed, falling back...', err?.message);
       }
     }
 
-    throw new Error(
-      'Word to PDF requires LibreOffice or Microsoft Edge/Chromium. Please run TOOLZIP via Docker (`docker compose up`) where LibreOffice is installed.'
-    );
+    // Method 3: Pure Node.js fallback via mammoth & pdf-lib (100% Vercel Serverless compatible)
+    let extractedText = '';
+    try {
+      const res = await mammoth.extractRawText({ path: inputFile.filepath });
+      extractedText = res.value || '';
+    } catch {
+      // If .doc or corrupt binary, attempt reading as text
+      extractedText = fs.readFileSync(inputFile.filepath, 'utf8').replace(/[^\x20-\x7E\r\n\t]/g, ' ');
+    }
+
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const rawLines = extractedText.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    const lines = rawLines.length > 0 ? rawLines : ['[Empty Document]'];
+
+    const pageWidth = 595.28; // A4
+    const pageHeight = 841.89;
+    const margin = 50;
+    const usableWidth = pageWidth - margin * 2;
+    const lineHeight = 18;
+
+    let currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
+    let currentY = pageHeight - margin - 20;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const isHeading = i === 0 && line.length < 80;
+      const fontSize = isHeading ? 18 : 11;
+      const activeFont = isHeading ? fontBold : font;
+      const fontColor = isHeading ? rgb(0.2, 0.05, 0.08) : rgb(0.15, 0.15, 0.15);
+
+      // Check page break
+      if (currentY < margin + 40) {
+        currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
+        currentY = pageHeight - margin - 20;
+      }
+
+      // Basic word wrap
+      const words = line.split(' ');
+      let currentLineText = '';
+
+      for (const w of words) {
+        const testLine = currentLineText ? `${currentLineText} ${w}` : w;
+        const textWidth = activeFont.widthOfTextAtSize(testLine, fontSize);
+        if (textWidth > usableWidth && currentLineText) {
+          currentPage.drawText(currentLineText, {
+            x: margin,
+            y: currentY,
+            size: fontSize,
+            font: activeFont,
+            color: fontColor,
+          });
+          currentY -= lineHeight;
+          currentLineText = w;
+          if (currentY < margin + 40) {
+            currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
+            currentY = pageHeight - margin - 20;
+          }
+        } else {
+          currentLineText = testLine;
+        }
+      }
+
+      if (currentLineText) {
+        currentPage.drawText(currentLineText, {
+          x: margin,
+          y: currentY,
+          size: fontSize,
+          font: activeFont,
+          color: fontColor,
+        });
+        currentY -= isHeading ? 26 : lineHeight + 4;
+      }
+    }
+
+    const outputBytes = await pdfDoc.save();
+    fs.writeFileSync(outputPath, outputBytes);
+
+    return {
+      outputPath,
+      outputFilename,
+      mimeType: 'application/pdf',
+    };
   },
 };

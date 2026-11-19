@@ -30,13 +30,11 @@ export interface ParsedPdfDocument {
 
 export async function parsePdfForEditing(pdfPath: string): Promise<ParsedPdfDocument> {
   const hasPython = (await hasBinary('python')) || (await hasBinary('python3'));
-  if (!hasPython) {
-    throw new Error('Python with PyMuPDF is required for direct PDF text editing and parsing.');
-  }
 
-  const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
-
-  const pyScript = `
+  if (hasPython) {
+    try {
+      const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
+      const pyScript = `
 import sys, json, base64
 try:
     import pymupdf as fitz
@@ -52,11 +50,9 @@ for page_idx, page in enumerate(doc):
     width = rect.width
     height = rect.height
     
-    # 1. Render high quality preview image
     pix = page.get_pixmap(dpi=150)
     img_b64 = base64.b64encode(pix.tobytes("jpeg")).decode("utf-8")
     
-    # 2. Extract detailed text spans with font, size, color, bbox
     d = page.get_text("dict")
     spans_list = []
     span_counter = 0
@@ -108,16 +104,98 @@ print(json.dumps({"pageCount": len(pages_data), "pages": pages_data}))
 print("===JSON_OUTPUT_END===")
 `;
 
-  const execRes = await execSafe(pythonBin, ['-c', pyScript, pdfPath], { timeoutMs: 90000 });
-  const startMarker = '===JSON_OUTPUT_START===';
-  const endMarker = '===JSON_OUTPUT_END===';
-  const startIdx = execRes.stdout.indexOf(startMarker);
-  const endIdx = execRes.stdout.indexOf(endMarker);
+      const execRes = await execSafe(pythonBin, ['-c', pyScript, pdfPath], { timeoutMs: 90000 });
+      const startMarker = '===JSON_OUTPUT_START===';
+      const endMarker = '===JSON_OUTPUT_END===';
+      const startIdx = execRes.stdout.indexOf(startMarker);
+      const endIdx = execRes.stdout.indexOf(endMarker);
 
-  if (startIdx === -1 || endIdx === -1) {
-    throw new Error('Failed to parse PDF document output from parser.');
+      if (startIdx !== -1 && endIdx !== -1) {
+        const jsonStr = execRes.stdout.substring(startIdx + startMarker.length, endIdx).trim();
+        return JSON.parse(jsonStr) as ParsedPdfDocument;
+      }
+    } catch (err) {
+      console.warn('Python PDF parser failed, falling back to pure Node engine:', err);
+    }
   }
 
-  const jsonStr = execRes.stdout.substring(startIdx + startMarker.length, endIdx).trim();
-  return JSON.parse(jsonStr) as ParsedPdfDocument;
+  // Pure Node.js fallback via pdf-parse & Mozilla PDF.js
+  const pdfBytes = fs.readFileSync(pdfPath);
+  const { PDFParse } = await import('pdf-parse');
+  const parser = new (PDFParse as any)({ data: new Uint8Array(pdfBytes) });
+
+  try {
+    const screenshot = await parser.getScreenshot({ scale: 1.5 });
+    await parser.load();
+
+    const pagesData: ParsedPage[] = [];
+    const totalPages = parser.doc?.numPages || 1;
+
+    for (let i = 1; i <= totalPages; i++) {
+      const page = await parser.doc.getPage(i);
+      const viewport = page.getViewport({ scale: 1 });
+      const content = await page.getTextContent();
+      const spans: TextSpan[] = [];
+      let spanCounter = 0;
+
+      for (const item of content.items) {
+        const text = (item as any).str || '';
+        if (!text.trim()) continue;
+
+        const transform = (item as any).transform || [12, 0, 0, 12, 0, 0];
+        const x = transform[4] || 0;
+        const y = transform[5] || 0;
+        const w = (item as any).width || 0;
+        const h = (item as any).height || Math.abs(transform[3]) || 12;
+
+        // Convert bottom-up PDF coordinates to top-down web coordinates
+        const y0 = Math.max(0, viewport.height - y - h);
+        const y1 = Math.max(0, viewport.height - y);
+        const x0 = x;
+        const x1 = x + w;
+        const fontName = (item as any).fontName || 'Helvetica';
+
+        spans.push({
+          id: `p${i - 1}_s${spanCounter++}`,
+          pageIndex: i - 1,
+          text,
+          bbox: [
+            parseFloat(x0.toFixed(2)),
+            parseFloat(y0.toFixed(2)),
+            parseFloat(x1.toFixed(2)),
+            parseFloat(y1.toFixed(2)),
+          ],
+          origin: [parseFloat(x0.toFixed(2)), parseFloat(y1.toFixed(2))],
+          font: fontName,
+          size: parseFloat(h.toFixed(1)),
+          colorHex: '#000000',
+          isBold: fontName.toLowerCase().includes('bold'),
+          isItalic:
+            fontName.toLowerCase().includes('oblique') || fontName.toLowerCase().includes('italic'),
+        });
+      }
+
+      const shotPage = screenshot.pages.find((p: any) => p.pageNumber === i);
+      pagesData.push({
+        pageIndex: i - 1,
+        width: parseFloat(viewport.width.toFixed(2)),
+        height: parseFloat(viewport.height.toFixed(2)),
+        imageBase64: shotPage?.dataUrl || '',
+        spans,
+      });
+
+      try {
+        page.cleanup();
+      } catch {}
+    }
+
+    return {
+      pageCount: pagesData.length,
+      pages: pagesData,
+    };
+  } finally {
+    try {
+      await parser.destroy();
+    } catch {}
+  }
 }

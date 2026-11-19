@@ -51,9 +51,19 @@ export async function POST(request: NextRequest) {
 
     const stats = fs.statSync(result.outputPath);
 
+    // Provide in-memory base64 data URL for instant serverless download
+    let fileData: string | undefined = undefined;
+    if (stats.size <= 4.5 * 1024 * 1024) {
+      try {
+        const fileBuffer = fs.readFileSync(result.outputPath);
+        fileData = `data:${result.mimeType};base64,${fileBuffer.toString('base64')}`;
+      } catch {}
+    }
+
     return NextResponse.json({
       success: true,
       downloadUrl: `/api/download/${jobId}`,
+      fileData,
       filename: result.outputFilename,
       size: stats.size,
     });

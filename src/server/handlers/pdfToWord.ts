@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { ToolHandler, ConversionContext, ConversionResult } from './types';
 import { execSafe, hasBinary } from '../utils/execHelper';
 
@@ -22,31 +22,36 @@ export const pdfToWordHandler: ToolHandler = {
     if (isSofficeAvailable) {
       try {
         const binary = (await hasBinary('soffice')) ? 'soffice' : 'libreoffice';
-        await execSafe(binary, [
-          '--headless',
-          '--infilter=writer_pdf_import',
-          '--convert-to',
-          'docx',
-          '--outdir',
-          outputDir,
-          inputFile.filepath,
-        ], { timeoutMs: 90000 });
+        await execSafe(
+          binary,
+          [
+            '--headless',
+            '--infilter=writer_pdf_import',
+            '--convert-to',
+            'docx',
+            '--outdir',
+            outputDir,
+            inputFile.filepath,
+          ],
+          { timeoutMs: 90000 }
+        );
 
-        const generatedFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.docx'));
+        const generatedFiles = fs.readdirSync(outputDir).filter((f) => f.endsWith('.docx'));
         if (generatedFiles.length > 0) {
           const actualDocx = path.join(outputDir, generatedFiles[0]);
           return {
             outputPath: actualDocx,
             outputFilename: generatedFiles[0],
-            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            mimeType:
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           };
         }
       } catch (err: any) {
-        console.warn('LibreOffice PDF-to-DOCX failed, falling back to pdf2docx...', err?.message);
+        console.warn('LibreOffice PDF-to-DOCX failed, falling back...', err?.message);
       }
     }
 
-    // Method 2: Python pdf2docx (high-fidelity layout, text, tables, styles)
+    // Method 2: Python pdf2docx / PyMuPDF if Python is present
     const hasPython = (await hasBinary('python')) || (await hasBinary('python3'));
     if (hasPython) {
       const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
@@ -60,98 +65,79 @@ cv = Converter(pdf_file)
 cv.convert(docx_file, start=0, end=None)
 cv.close()
 `;
-        await execSafe(pythonBin, ['-c', pyScript, inputFile.filepath, outputPath], { timeoutMs: 120000 });
+        await execSafe(pythonBin, ['-c', pyScript, inputFile.filepath, outputPath], {
+          timeoutMs: 120000,
+        });
 
-        if (fs.existsSync(outputPath)) {
+        if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
           return {
             outputPath,
             outputFilename,
-            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            mimeType:
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           };
         }
       } catch (err: any) {
-        console.warn('Python pdf2docx failed, falling back to text extractor...', err?.message);
+        console.warn('Python pdf2docx failed, falling back to pure Node engine...', err?.message);
       }
     }
 
-    // Method 3: PyMuPDF block extractor + docx library
-    if (hasPython) {
-      const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
-      try {
-        const pyExtractScript = `
-import sys, json
-try:
-    import pymupdf as fitz
-except ImportError:
-    import fitz
+    // Method 3: Pure Node.js fallback via pdf-parse & docx (100% Vercel Serverless compatible)
+    const inBytes = fs.readFileSync(inputFile.filepath);
+    const { PDFParse } = await import('pdf-parse');
+    const parser = new (PDFParse as any)({ data: new Uint8Array(inBytes) });
 
-doc = fitz.open(sys.argv[1])
-pages_data = []
-for page in doc:
-    blocks = page.get_text("blocks")
-    page_blocks = []
-    for b in blocks:
-        # b = (x0, y0, x1, y1, text, block_no, block_type)
-        if b[6] == 0: # text block
-            txt = b[4].strip()
-            if txt:
-                page_blocks.append(txt)
-    pages_data.append(page_blocks)
+    try {
+      const textObj = await parser.getText();
+      const docChildren: Paragraph[] = [];
 
-print(json.dumps(pages_data))
-`;
-        const res = await execSafe(pythonBin, ['-c', pyExtractScript, inputFile.filepath], { timeoutMs: 45000 });
-        const pages: string[][] = JSON.parse(res.stdout.substring(res.stdout.indexOf('[')));
+      for (let i = 0; i < textObj.pages.length; i++) {
+        const pageText = textObj.pages[i].text || '';
+        const lines = pageText.split(/\r?\n/).filter((l: string) => l.trim().length > 0);
 
-        const docChildren: Paragraph[] = [];
-        for (let i = 0; i < pages.length; i++) {
-          if (i > 0) {
-            docChildren.push(
-              new Paragraph({
-                children: [new TextRun({ text: '', break: 1 })],
-                pageBreakBefore: true,
-              })
-            );
-          }
-          for (const blockText of pages[i]) {
-            const lines = blockText.split(/\r?\n/);
-            for (const line of lines) {
-              if (line.trim()) {
-                docChildren.push(
-                  new Paragraph({
-                    children: [new TextRun({ text: line.trim(), size: 24 })],
-                    spacing: { after: 120 },
-                  })
-                );
-              }
-            }
-          }
+        for (let j = 0; j < lines.length; j++) {
+          const line = lines[j].trim();
+          const isHeading = j === 0 && line.length < 60;
+          docChildren.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: line,
+                  bold: isHeading,
+                  size: isHeading ? 30 : 22,
+                  font: 'Arial',
+                }),
+              ],
+              pageBreakBefore: i > 0 && j === 0,
+              spacing: { after: 120 },
+            })
+          );
         }
-
-        const doc = new Document({
-          sections: [
-            {
-              properties: {},
-              children: docChildren.length > 0 ? docChildren : [new Paragraph('Converted Document')],
-            },
-          ],
-        });
-
-        const buffer = await Packer.toBuffer(doc);
-        fs.writeFileSync(outputPath, buffer);
-
-        return {
-          outputPath,
-          outputFilename,
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        };
-      } catch (err: any) {
-        console.warn('PyMuPDF extraction failed...', err?.message);
       }
-    }
 
-    throw new Error(
-      'Could not convert PDF to Word. Please ensure Python (with pdf2docx or pymupdf) or LibreOffice is installed.'
-    );
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children:
+              docChildren.length > 0 ? docChildren : [new Paragraph('Converted Document')],
+          },
+        ],
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      fs.writeFileSync(outputPath, buffer);
+
+      return {
+        outputPath,
+        outputFilename,
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      };
+    } finally {
+      try {
+        await parser.destroy();
+      } catch {}
+    }
   },
 };

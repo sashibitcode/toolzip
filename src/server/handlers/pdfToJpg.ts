@@ -15,32 +15,56 @@ export const pdfToJpgHandler: ToolHandler = {
     const inputFile = inputFiles[0];
     const baseName = path.parse(inputFile.originalFilename).name;
     const isPdftoppmAvailable = await hasBinary('pdftoppm');
-    const isGsAvailable = (await hasBinary('gs')) || (await hasBinary('gswin64c')) || (await hasBinary('gswin32c'));
+    const isGsAvailable =
+      (await hasBinary('gs')) || (await hasBinary('gswin64c')) || (await hasBinary('gswin32c'));
     const hasPython = (await hasBinary('python')) || (await hasBinary('python3'));
 
-    if (isPdftoppmAvailable) {
-      const outputPrefix = path.join(outputDir, 'page');
-      await execSafe('pdftoppm', ['-jpeg', '-r', '150', inputFile.filepath, outputPrefix], { timeoutMs: 60000 });
-    } else if (isGsAvailable) {
-      const gsBin = (await hasBinary('gs'))
-        ? 'gs'
-        : (await hasBinary('gswin64c'))
-        ? 'gswin64c'
-        : 'gswin32c';
+    let rendered = false;
 
-      const outputPattern = path.join(outputDir, 'page-%d.jpg');
-      await execSafe(gsBin, [
-        '-sDEVICE=jpeg',
-        '-dJPEGQ=90',
-        '-r150',
-        `-sOutputFile=${outputPattern}`,
-        '-dNOPAUSE',
-        '-dBATCH',
-        inputFile.filepath,
-      ], { timeoutMs: 60000 });
-    } else if (hasPython) {
-      const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
-      const pyRenderScript = `
+    if (isPdftoppmAvailable) {
+      try {
+        const outputPrefix = path.join(outputDir, 'page');
+        await execSafe('pdftoppm', ['-jpeg', '-r', '150', inputFile.filepath, outputPrefix], {
+          timeoutMs: 60000,
+        });
+        rendered = true;
+      } catch (e) {
+        console.warn('pdftoppm failed, trying fallback:', e);
+      }
+    }
+
+    if (!rendered && isGsAvailable) {
+      try {
+        const gsBin = (await hasBinary('gs'))
+          ? 'gs'
+          : (await hasBinary('gswin64c'))
+          ? 'gswin64c'
+          : 'gswin32c';
+
+        const outputPattern = path.join(outputDir, 'page-%d.jpg');
+        await execSafe(
+          gsBin,
+          [
+            '-sDEVICE=jpeg',
+            '-dJPEGQ=90',
+            '-r150',
+            `-sOutputFile=${outputPattern}`,
+            '-dNOPAUSE',
+            '-dBATCH',
+            inputFile.filepath,
+          ],
+          { timeoutMs: 60000 }
+        );
+        rendered = true;
+      } catch (e) {
+        console.warn('Ghostscript failed, trying fallback:', e);
+      }
+    }
+
+    if (!rendered && hasPython) {
+      try {
+        const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
+        const pyRenderScript = `
 import sys
 try:
     import pymupdf as fitz
@@ -52,16 +76,39 @@ out_dir = sys.argv[2]
 for i, page in enumerate(doc):
     pix = page.get_pixmap(dpi=150)
     pix.save(f"{out_dir}/page-{i+1}.jpg")
+doc.close()
 `;
-      await execSafe(pythonBin, ['-c', pyRenderScript, inputFile.filepath, outputDir], { timeoutMs: 60000 });
-    } else {
-      throw new Error(
-        'PDF to JPG requires Poppler (`pdftoppm`), Ghostscript, or Python (PyMuPDF).'
-      );
+        await execSafe(pythonBin, ['-c', pyRenderScript, inputFile.filepath, outputDir], {
+          timeoutMs: 60000,
+        });
+        rendered = true;
+      } catch (e) {
+        console.warn('Python render failed, trying pure Node fallback:', e);
+      }
+    }
+
+    // Pure Node.js fallback via pdf-parse screenshot engine (100% Vercel compatible)
+    if (!rendered) {
+      const pdfBytes = fs.readFileSync(inputFile.filepath);
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new (PDFParse as any)({ data: new Uint8Array(pdfBytes) });
+      try {
+        const screenshot = await parser.getScreenshot({ scale: 2 });
+        for (const p of screenshot.pages) {
+          fs.writeFileSync(path.join(outputDir, `page-${p.pageNumber}.jpg`), p.data);
+        }
+      } finally {
+        try {
+          await parser.destroy();
+        } catch {}
+      }
     }
 
     // Inspect generated JPGs
-    const generatedJpgs = fs.readdirSync(outputDir).filter(f => f.toLowerCase().endsWith('.jpg') || f.toLowerCase().endsWith('.jpeg'));
+    const generatedJpgs = fs
+      .readdirSync(outputDir)
+      .filter((f) => f.toLowerCase().endsWith('.jpg') || f.toLowerCase().endsWith('.jpeg'));
+
     if (generatedJpgs.length === 0) {
       throw new Error('No images were extracted from the PDF.');
     }

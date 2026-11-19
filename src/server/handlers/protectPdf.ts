@@ -22,12 +22,10 @@ export const protectPdfHandler: ToolHandler = {
     const outputPath = path.join(outputDir, outputFilename);
 
     const hasPython = (await hasBinary('python')) || (await hasBinary('python3'));
-    if (!hasPython) {
-      throw new Error('AES-256 PDF encryption engine requires Python environment on server.');
-    }
-
-    const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
-    const script = `
+    if (hasPython) {
+      try {
+        const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
+        const script = `
 import sys
 try:
     import pymupdf as fitz
@@ -45,7 +43,28 @@ except Exception:
         writer.write(f)
 `;
 
-    await execSafe(pythonBin, ['-c', script, inputFile.filepath, outputPath, password], { timeoutMs: 30000 });
+        await execSafe(pythonBin, ['-c', script, inputFile.filepath, outputPath, password], {
+          timeoutMs: 30000,
+        });
+
+        if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+          return {
+            outputPath,
+            outputFilename,
+            mimeType: 'application/pdf',
+          };
+        }
+      } catch (pyErr) {
+        console.warn('Python encryption failed, falling back to pure Node engine:', pyErr);
+      }
+    }
+
+    // Pure Node.js AES-256 encryption engine (100% Vercel Serverless compatible)
+    const inBytes = fs.readFileSync(inputFile.filepath);
+    const { encryptPDF } = await import('@pdfsmaller/pdf-encrypt');
+    const encryptedBytes = await encryptPDF(new Uint8Array(inBytes), password);
+
+    fs.writeFileSync(outputPath, Buffer.from(encryptedBytes));
 
     if (!fs.existsSync(outputPath)) {
       throw new Error('Encryption failed to produce output document.');

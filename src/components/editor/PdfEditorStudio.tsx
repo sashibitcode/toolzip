@@ -51,7 +51,7 @@ export default function PdfEditorStudio() {
 
   // Saving state
   const [isSaving, setIsSaving] = useState(false);
-  const [saveResult, setSaveResult] = useState<{ downloadUrl: string; filename: string; size: number } | null>(null);
+  const [saveResult, setSaveResult] = useState<{ downloadUrl: string; fileData?: string; filename: string; size: number } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -315,7 +315,7 @@ export default function PdfEditorStudio() {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <a
-            href={saveResult.downloadUrl}
+            href={saveResult.fileData || saveResult.downloadUrl}
             download={saveResult.filename}
             className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-8 py-3.5 bg-primary hover:bg-primary-hover text-white font-medium rounded-xl shadow-sm transition-all text-sm"
           >

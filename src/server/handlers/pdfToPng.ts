@@ -18,12 +18,24 @@ export const pdfToPngHandler: ToolHandler = {
     const hasPdftoppm = await hasBinary('pdftoppm');
     const hasPython = (await hasBinary('python')) || (await hasBinary('python3'));
 
+    let rendered = false;
+
     if (hasPdftoppm) {
-      const outputPrefix = path.join(outputDir, 'page');
-      await execSafe('pdftoppm', ['-png', '-r', '150', inputFile.filepath, outputPrefix], { timeoutMs: 60000 });
-    } else if (hasPython) {
-      const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
-      const script = `
+      try {
+        const outputPrefix = path.join(outputDir, 'page');
+        await execSafe('pdftoppm', ['-png', '-r', '150', inputFile.filepath, outputPrefix], {
+          timeoutMs: 60000,
+        });
+        rendered = true;
+      } catch (e) {
+        console.warn('pdftoppm failed, trying fallback:', e);
+      }
+    }
+
+    if (!rendered && hasPython) {
+      try {
+        const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
+        const script = `
 import sys
 try:
     import pymupdf as fitz
@@ -36,9 +48,30 @@ for i, page in enumerate(doc):
     pix.save(f"{sys.argv[2]}/page_{i+1}.png")
 doc.close()
 `;
-      await execSafe(pythonBin, ['-c', script, inputFile.filepath, outputDir], { timeoutMs: 60000 });
-    } else {
-      throw new Error('PDF to PNG conversion requires pdftoppm or Python PyMuPDF installed.');
+        await execSafe(pythonBin, ['-c', script, inputFile.filepath, outputDir], {
+          timeoutMs: 60000,
+        });
+        rendered = true;
+      } catch (e) {
+        console.warn('Python render failed, trying pure Node fallback:', e);
+      }
+    }
+
+    // Pure Node.js fallback via pdf-parse screenshot engine (100% Vercel compatible)
+    if (!rendered) {
+      const pdfBytes = fs.readFileSync(inputFile.filepath);
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new (PDFParse as any)({ data: new Uint8Array(pdfBytes) });
+      try {
+        const screenshot = await parser.getScreenshot({ scale: 2 });
+        for (const p of screenshot.pages) {
+          fs.writeFileSync(path.join(outputDir, `page_${p.pageNumber}.png`), p.data);
+        }
+      } finally {
+        try {
+          await parser.destroy();
+        } catch {}
+      }
     }
 
     const generatedPngs = fs
@@ -65,7 +98,7 @@ doc.close()
     }
 
     // Multiple pages: package into ZIP
-    const zipFilename = `${baseName}_png_images.zip`;
+    const zipFilename = `${baseName}_pages.zip`;
     const zipPath = path.join(outputDir, zipFilename);
     const outputStream = fs.createWriteStream(zipPath);
     const archive = archiver('zip', { zlib: { level: 9 } });

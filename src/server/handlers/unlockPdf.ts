@@ -18,12 +18,9 @@ export const unlockPdfHandler: ToolHandler = {
     const outputPath = path.join(outputDir, outputFilename);
 
     const hasPython = (await hasBinary('python')) || (await hasBinary('python3'));
-    if (!hasPython) {
-      throw new Error('PDF decryption engine requires Python environment on server.');
-    }
-
-    const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
-    const script = `
+    if (hasPython) {
+      const pythonBin = (await hasBinary('python')) ? 'python' : 'python3';
+      const script = `
 import sys
 try:
     import pymupdf as fitz
@@ -49,10 +46,38 @@ except Exception as e:
         writer.write(f)
 `;
 
+      try {
+        await execSafe(pythonBin, ['-c', script, inputFile.filepath, outputPath, password], {
+          timeoutMs: 30000,
+        });
+
+        if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+          return {
+            outputPath,
+            outputFilename,
+            mimeType: 'application/pdf',
+          };
+        }
+      } catch (err: any) {
+        if (err?.message?.includes('Incorrect password')) {
+          throw new Error('Incorrect password. Please check the document password and try again.');
+        }
+        console.warn('Python decrypt failed, falling back to pure Node engine:', err);
+      }
+    }
+
+    // Pure Node.js decryption engine (100% Vercel Serverless compatible)
+    const inBytes = fs.readFileSync(inputFile.filepath);
+    const { decryptPDF } = await import('@localonlytools/pdf-decrypt');
+
     try {
-      await execSafe(pythonBin, ['-c', script, inputFile.filepath, outputPath, password], { timeoutMs: 30000 });
+      const decryptedBytes = await decryptPDF(new Uint8Array(inBytes), password);
+      fs.writeFileSync(outputPath, Buffer.from(decryptedBytes));
     } catch (err: any) {
-      if (err?.message?.includes('Incorrect password')) {
+      if (
+        err?.message?.toLowerCase().includes('password') ||
+        err?.message?.toLowerCase().includes('match')
+      ) {
         throw new Error('Incorrect password. Please check the document password and try again.');
       }
       throw err;
