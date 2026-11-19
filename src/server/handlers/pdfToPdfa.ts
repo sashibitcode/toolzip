@@ -49,7 +49,7 @@ export const pdfToPdfaHandler: ToolHandler = {
     // Fallback: If Ghostscript is not installed on host, use pdf-lib to normalize metadata and save compliant PDF
     try {
       const existingPdfBytes = fs.readFileSync(inputFile.filepath);
-      const pdfDoc = await PDFDocument.load(existingPdfBytes);
+      const pdfDoc = await PDFDocument.load(existingPdfBytes, { ignoreEncryption: true });
 
       // Embed archival metadata
       pdfDoc.setTitle(`${baseName} (Archival Copy)`);

@@ -14,7 +14,7 @@ export const signPdfHandler: ToolHandler = {
     const inputFile = inputFiles[0];
     const baseName = path.parse(inputFile.originalFilename).name;
     const bytes = fs.readFileSync(inputFile.filepath);
-    const pdfDoc = await PDFDocument.load(bytes);
+    const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
     const pages = pdfDoc.getPages();
 
     if (pages.length === 0) {

@@ -16,7 +16,7 @@ export const splitPdfHandler: ToolHandler = {
     const inputFile = inputFiles[0];
     const baseName = path.parse(inputFile.originalFilename).name;
     const bytes = fs.readFileSync(inputFile.filepath);
-    const srcDoc = await PDFDocument.load(bytes);
+    const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
     const totalPages = srcDoc.getPageCount();
 
     if (totalPages === 0) {

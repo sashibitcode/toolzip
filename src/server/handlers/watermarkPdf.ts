@@ -19,7 +19,7 @@ export const watermarkPdfHandler: ToolHandler = {
     const inputFile = inputFiles[0];
     const baseName = path.parse(inputFile.originalFilename).name;
     const bytes = fs.readFileSync(inputFile.filepath);
-    const pdfDoc = await PDFDocument.load(bytes);
+    const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
     const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const pages = pdfDoc.getPages();
 

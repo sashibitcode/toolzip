@@ -15,7 +15,14 @@ export const mergePdfHandler: ToolHandler = {
 
     for (const file of inputFiles) {
       const bytes = fs.readFileSync(file.filepath);
-      const srcDoc = await PDFDocument.load(bytes);
+      let srcDoc: PDFDocument;
+      try {
+        srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      } catch (loadErr: any) {
+        throw new Error(
+          `Unable to open "${file.originalFilename}". The file may be password-protected or corrupted.`
+        );
+      }
       const copiedPages = await mergedDoc.copyPages(srcDoc, srcDoc.getPageIndices());
       copiedPages.forEach((page) => mergedDoc.addPage(page));
     }

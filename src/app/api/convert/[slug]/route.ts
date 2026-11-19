@@ -6,7 +6,11 @@ import { getHandler } from '@/server/handlers';
 import { createJobWorkspace, sanitizeFilename, startAutoCleanup } from '@/server/utils/storage';
 import { checkRateLimit } from '@/server/utils/rateLimit';
 
-// Ensure auto cleanup is active
+// Force dynamic route & allow up to 60s runtime on serverless platforms like Vercel
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+// Ensure auto cleanup is active (safe on serverless)
 startAutoCleanup();
 
 export async function POST(
@@ -141,10 +145,23 @@ export async function POST(
 
     const outputStats = fs.statSync(result.outputPath);
 
+    // If file is within serverless payload budget (<= 4.5MB), provide base64 data URL
+    // so the browser can download directly in-memory without needing a second lambda instance hop.
+    let fileData: string | undefined = undefined;
+    if (outputStats.size <= 4.5 * 1024 * 1024) {
+      try {
+        const fileBuffer = fs.readFileSync(result.outputPath);
+        fileData = `data:${result.mimeType};base64,${fileBuffer.toString('base64')}`;
+      } catch {
+        // Fallback to downloadUrl
+      }
+    }
+
     return NextResponse.json({
       success: true,
       jobId: workspace.jobId,
       downloadUrl: `/api/download/${workspace.jobId}`,
+      fileData,
       filename: result.outputFilename,
       mimeType: result.mimeType,
       size: outputStats.size,

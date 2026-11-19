@@ -15,7 +15,7 @@ export const rotatePdfHandler: ToolHandler = {
     const inputFile = inputFiles[0];
     const baseName = path.parse(inputFile.originalFilename).name;
     const bytes = fs.readFileSync(inputFile.filepath);
-    const pdfDoc = await PDFDocument.load(bytes);
+    const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
     const totalPages = pdfDoc.getPageCount();
 
     if (totalPages === 0) {

@@ -59,7 +59,7 @@ except Exception:
 
     // Pure Node pdf-lib fallback
     const bytes = fs.readFileSync(inputFile.filepath);
-    const pdfDoc = await PDFDocument.load(bytes);
+    const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
     try {
       const form = pdfDoc.getForm();
       form.flatten();

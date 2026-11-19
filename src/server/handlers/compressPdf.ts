@@ -67,7 +67,7 @@ doc.close()
 
     // Pure Node fallback using pdf-lib object stream compression
     const bytes = fs.readFileSync(inputFile.filepath);
-    const pdfDoc = await PDFDocument.load(bytes);
+    const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
     const compressedBytes = await pdfDoc.save({ useObjectStreams: true });
     fs.writeFileSync(outputPath, compressedBytes);
 

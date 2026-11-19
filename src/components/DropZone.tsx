@@ -43,6 +43,7 @@ interface SelectedFile {
 interface ConversionSuccessData {
   jobId: string;
   downloadUrl: string;
+  fileData?: string;
   filename: string;
   size: number;
 }
@@ -324,10 +325,25 @@ export default function DropZone({ tool }: DropZoneProps) {
         body: formData,
       });
 
-      const data = await response.json();
+      let data: any = null;
+      const responseText = await response.text();
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        if (!response.ok) {
+          if (response.status === 413) {
+            throw new Error('The uploaded file is too large for the server. Please try a file under 25MB.');
+          } else if (response.status === 504) {
+            throw new Error('Conversion timed out on the server. Please try with fewer pages.');
+          } else {
+            throw new Error(`Server returned error status ${response.status}. Please try again.`);
+          }
+        }
+        throw new Error('Server returned an invalid response. Please try again.');
+      }
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Conversion failed. Please try again.');
+      if (!response.ok || !data || !data.success) {
+        throw new Error(data?.error || `Conversion failed (${response.status}). Please try again.`);
       }
 
       setProgressStep('Complete!');
@@ -374,7 +390,7 @@ export default function DropZone({ tool }: DropZoneProps) {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <a
-              href={result.downloadUrl}
+              href={result.fileData || result.downloadUrl}
               download={result.filename}
               className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-8 py-3.5 bg-primary hover:bg-primary-hover active:scale-[0.98] text-white font-medium rounded-xl shadow-sm transition-all text-sm"
             >

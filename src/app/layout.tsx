@@ -82,6 +82,11 @@ export const metadata: Metadata = {
     'google-site-verification': 'H1VaM4zOcJ9KYa-x-C4MMOhkovetODClD6duII0LNc0',
     'msvalidate.01': 'BING_WEBMASTER_VERIFICATION_TOKEN',
   },
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
