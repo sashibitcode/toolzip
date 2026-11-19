@@ -1,3 +1,4 @@
+import './nodePolyfill';
 import fs from 'fs';
 import path from 'path';
 import { execSafe, hasBinary } from './execHelper';

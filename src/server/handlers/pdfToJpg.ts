@@ -1,3 +1,4 @@
+import '../utils/nodePolyfill';
 import fs from 'fs';
 import path from 'path';
 import archiver from 'archiver';

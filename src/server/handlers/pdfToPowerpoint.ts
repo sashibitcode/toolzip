@@ -1,3 +1,4 @@
+import '../utils/nodePolyfill';
 import fs from 'fs';
 import path from 'path';
 import pptxgen from 'pptxgenjs';
@@ -176,6 +177,16 @@ for i, page in enumerate(doc):
         mimeType:
           'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       };
+    } catch (parseErr: any) {
+      if (
+        parseErr?.name === 'PasswordException' ||
+        parseErr?.message?.toLowerCase().includes('password')
+      ) {
+        throw new Error(
+          'This PDF document is password-protected. Please unlock it using the Unlock PDF tool first.'
+        );
+      }
+      throw parseErr;
     } finally {
       try {
         await parser.destroy();

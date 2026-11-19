@@ -13,6 +13,7 @@ const nextConfig = {
       '@localonlytools/pdf-decrypt',
       'mammoth',
       'jszip',
+      '@thednp/dommatrix',
     ],
   },
 };

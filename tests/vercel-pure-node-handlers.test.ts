@@ -225,6 +225,35 @@ test('Vercel Zero-Dependency Suite Verification', async (t) => {
     assert.ok(htmlResult.outputFilename.endsWith('.pdf'));
   });
 
+  await t.test('8. Protected PDF to Word graceful handling: DOMMatrix defined and clean user error', async () => {
+    assert.ok(typeof (globalThis as any).DOMMatrix !== 'undefined', 'DOMMatrix must be polyfilled globally');
+    assert.ok(typeof (globalThis as any).Path2D !== 'undefined', 'Path2D must be polyfilled globally');
+
+    const pdfPath = await createSamplePdf('sample_encrypted_for_word.pdf');
+    const protectResult = await protectPdfHandler.convert({
+      jobId: 'test_protect_for_word',
+      inputFiles: [{ filepath: pdfPath, originalFilename: 'sample_encrypted_for_word.pdf', mimeType: 'application/pdf', size: 1000 }],
+      outputDir: tempDir,
+      options: { password: 'SecretPassword99' },
+    });
+
+    await assert.rejects(
+      async () => {
+        await pdfToWordHandler.convert({
+          jobId: 'test_word_from_protected',
+          inputFiles: [{ filepath: protectResult.outputPath, originalFilename: 'sample_encrypted_for_word_protected.pdf', mimeType: 'application/pdf', size: 1000 }],
+          outputDir: tempDir,
+        });
+      },
+      (err: any) => {
+        // Must NOT be "DOMMatrix is not defined"
+        assert.ok(!err.message.includes('DOMMatrix'));
+        assert.ok(err.message.includes('password-protected'));
+        return true;
+      }
+    );
+  });
+
   // Cleanup temp dir
   try {
     fs.rmSync(tempDir, { recursive: true, force: true });

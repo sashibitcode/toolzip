@@ -1,3 +1,4 @@
+import '../utils/nodePolyfill';
 import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
@@ -139,6 +140,16 @@ print(json.dumps(rows))
         mimeType:
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       };
+    } catch (parseErr: any) {
+      if (
+        parseErr?.name === 'PasswordException' ||
+        parseErr?.message?.toLowerCase().includes('password')
+      ) {
+        throw new Error(
+          'This PDF document is password-protected. Please unlock it using the Unlock PDF tool first.'
+        );
+      }
+      throw parseErr;
     } finally {
       try {
         await parser.destroy();

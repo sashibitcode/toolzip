@@ -14,6 +14,7 @@
   "dependencies": {
     "@localonlytools/pdf-decrypt": "^1.0.1",
     "@pdfsmaller/pdf-encrypt": "^1.2.0",
+    "@thednp/dommatrix": "^3.1.4",
     "archiver": "^7.0.1",
     "clsx": "^2.1.1",
     "docx": "^9.15.4",
